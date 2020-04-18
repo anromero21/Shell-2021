@@ -18,7 +18,7 @@ void ExternalInterrupt::begin(uint8_t pin, uint8_t type, uint16_t bouncing_time_
 	attachInterrupt(_pin, std::bind(&ExternalInterrupt::handle, this), type);
 }
 
-void IRAM_ATTR ExternalInterrupt::handle()
+void IRAM_ATTR ExternalInterrupt::handle() // Está en la RAM para más velocidad
 {
 	_delta_micros = micros() - _micros_prev;
 	if (_delta_micros >= _bouncing_time)

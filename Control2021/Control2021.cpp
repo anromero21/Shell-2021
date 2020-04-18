@@ -12,9 +12,10 @@ int LA = 26;
 int LB = 27;
 int LC = 14;
 
-int ENCA = 19;
+int ENCA = 19; //
 int ENCB = 5;
 int ENCC = 18;
+
 int _ENCA = 19;
 int _ENCB =  5;
 int _ENCC = 18;
@@ -30,6 +31,7 @@ bool sens_a;
 bool sens_b;
 bool sens_c;
 
+// PWM
 const int freq = 2000;
 const int res = 10; // 0 - 1023
 const int CHANAH = 0;
@@ -65,10 +67,6 @@ void setup() {
 
 void loop() {
   lec = analogRead(pot);
-  
-  sens_a = digitalRead(_ENCA);
-  sens_b = digitalRead(_ENCB);
-  sens_c = digitalRead(_ENCC);
 
   int sensor_a = encA.getState();
   int sensor_b = encB.getState();
@@ -76,20 +74,20 @@ void loop() {
 
   char step = ' ';
   uint8_t sensor_sequence = 0;
-  bitWrite(sensor_sequence, 2, sensor_a);
-  bitWrite(sensor_sequence, 1, sensor_b);
-  bitWrite(sensor_sequence, 0, sensor_c);
+  bitWrite(sensor_sequence, 2, sensor_a); // 101
+  bitWrite(sensor_sequence, 1, sensor_b); // abc
+  bitWrite(sensor_sequence, 0, sensor_c); // 000
 
   switch (sensor_sequence)
   {
-    case 1:
+    case 1: // 001
       if (direction == 'FORWARD')
-        step = 'CB';
+        step = 'CB'; // 1-H 2-L
       else
         step = 'BC';
       break;
 
-    case 2:
+    case 2: // 010
       if (direction == 'FORWARD')
         step = 'BA';
       else
@@ -131,7 +129,9 @@ void loop() {
       switch (step)
       {
         case 'BC':
-          
+          // Activación de fases
+          ledcWrite(CHANAH,0);
+
           break;
 
         case 'AC':
