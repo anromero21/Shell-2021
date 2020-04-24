@@ -12,7 +12,7 @@ int LA = 26;
 int LB = 27;
 int LC = 14;
 
-int ENCA = 19; //
+int ENCA = 19;
 int ENCB = 5;
 int ENCC = 18;
 
@@ -21,7 +21,7 @@ int _ENCB =  5;
 int _ENCC = 18;
 
 int pot = 22;
-int lec = 0;
+int pwm = 0;
 
 ExternalInterrupt encA;
 ExternalInterrupt encB;
@@ -66,7 +66,7 @@ void setup() {
 }
 
 void loop() {
-  lec = analogRead(pot);
+  pwm = analogRead(pot);
 
   int sensor_a = encA.getState();
   int sensor_b = encB.getState();
@@ -130,28 +130,75 @@ void loop() {
       {
         case 'BC':
           // Activación de fases
+          delayMicroseconds(10);
+
           ledcWrite(CHANAH,0);
+          ledcWrite(CHANBH,pwm);
+          ledcWrite(CHANCH,0);
+          ledcWrite(CHANAL,0);
+          ledcWrite(CHANBL,0);
+          ledcWrite(CHANCL,pwm);
 
           break;
 
         case 'AC':
-          
+          delayMicroseconds(10);
+
+          ledcWrite(CHANAH,pwm);
+          ledcWrite(CHANBH,0);
+          ledcWrite(CHANCH,0);
+          ledcWrite(CHANAL,0);
+          ledcWrite(CHANBL,0);
+          ledcWrite(CHANCL,pwm);
+
           break;
 
         case 'AB':
-          
+          delayMicroseconds(10);
+
+          ledcWrite(CHANAH,pwm);
+          ledcWrite(CHANBH,0);
+          ledcWrite(CHANCH,0);
+          ledcWrite(CHANAL,0);
+          ledcWrite(CHANBL,pwm);
+          ledcWrite(CHANCL,0);
+
           break;
 
         case 'CB':
-          
+          delayMicroseconds(10);
+
+          ledcWrite(CHANAH,0);
+          ledcWrite(CHANBH,0);
+          ledcWrite(CHANCH,pwm);
+          ledcWrite(CHANAL,0);
+          ledcWrite(CHANBL,pwm);
+          ledcWrite(CHANCL,0);
+
           break;
 
         case 'CA':
-          
+          delayMicroseconds(10);
+
+          ledcWrite(CHANAH,0);
+          ledcWrite(CHANBH,0);
+          ledcWrite(CHANCH,pwm);
+          ledcWrite(CHANAL,pwm);
+          ledcWrite(CHANBL,0);
+          ledcWrite(CHANCL,0);
+
           break;
 
         case 'BA':
-          
+          delayMicroseconds(10);
+
+          ledcWrite(CHANAH,0);
+          ledcWrite(CHANBH,pwm);
+          ledcWrite(CHANCH,0);
+          ledcWrite(CHANAL,pwm);
+          ledcWrite(CHANBL,0);
+          ledcWrite(CHANCL,0);
+
           break;
 
         default:
