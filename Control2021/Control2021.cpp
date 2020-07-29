@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <ESP32_ExtInterrupt.h>
-
+//aquí llegó el master
 #define A 0
 #define B 1
 #define C 2
