@@ -1,9 +1,24 @@
 #include <Arduino.h>
 
 void setup() {
-  // put your setup code here, to run once:
+ 
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  chave();
+}
+
+void chave(){
+  int lec = digitalRead(PUSH);
+
+   if(PUSH == true){
+    ledcWrite(A,2048);
+    delay(500);
+    Serial.println("Todo OK -> " + String(lec));
+  }
+
+  else{
+    digitalWrite(LED,LOW);
+  }
+
 }
