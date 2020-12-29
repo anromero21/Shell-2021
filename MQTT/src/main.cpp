@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
+#include <iostream>
 
 //***********************************
 //*********** DEFINITIONS ***********
@@ -10,16 +11,12 @@
 //***********************************
 //*********** MQTT CONFIG ***********
 //***********************************
-const char *mqttServer = "ioticos.org";
+const char *mqttServer = "broker.mqttdashboard.com";
 const int mqttPort = 1883;
-const char *mqttUser = "VjclYKIMveCXbG0";
-const char *mqttPass = "2xAfdxh1sV7owRE";
-const char *subscribe = "Fb91eInFO93GxEe/input";
-const char *publish_s = "Fb91eInFO93GxEe/speed";
-const char *publish_e = "Fb91eInFO93GxEe/error";
-const char *publish_v = "Fb91eInFO93GxEe/voltage";
-const char *publish_c = "Fb91eInFO93GxEe/current";
-const char *publish_g = "Fb91eInFO93GxEe/gps";
+const char *mqttUser = "ARL210701";
+const char *mqttPass = "Shell2020";
+const char *subscribe = "ESBCCM2020/input";
+const char *publish = "ESBCCM2020";
 
 //***********************************
 //*********** WIFI CONFIG ***********
@@ -38,11 +35,7 @@ String voltage;
 String current;
 String error;
 String gps;
-char sendS[5];
-char sendV[5];
-char sendC[5];
-char sendE[5];
-char sendG[5];
+char send[5];
 String buffer;
 int count = 1;
 
@@ -51,14 +44,13 @@ int count = 1;
 //***********************************
 TaskHandle_t Task1,Task2;
 
-
 //***********************************
 //************ FUNCTIONS ************
 //***********************************
 void callback(char* topic, byte* payload, unsigned int length);
 void reconnect();
 void setup_wifi();
-void communication(void* parameter);
+//void communication(void* parameter);
 
 
 //***********************************
@@ -66,6 +58,7 @@ void communication(void* parameter);
 //***********************************
 void setup() {
 
+/*
 	xTaskCreatePinnedToCore(
 		communication, // Función elegida
 		"Task_1", 
@@ -75,19 +68,7 @@ void setup() {
 		&Task1, // Created Task
 		0 // Core
 	);
-	
-/*
-	xTaskCreatePinnedToCore(
-		GPS, // Función elegida
-		"Task 2",
-		1000, // Stack
-		NULL, // No parameters
-		1, // Priority
-		&Task2, // Created Task
-		0 // Core
-	);
-	*/
-
+*/
 	Serial.begin(115200);
 
 	setup_wifi();
@@ -104,68 +85,20 @@ void setup() {
 // Communication with MQTT Broker
 void loop() {
 	if (!client.connected()) {
-			reconnect();
-		}
-
-		if (client.connected()) {
-			//String vel = String(v);
-			//values[5].toCharArray(sendVal, 10);
-			speed.toCharArray(sendS, 5);
-			voltage.toCharArray(sendV, 5);
-			current.toCharArray(sendC, 5);
-			error.toCharArray(sendE, 5);
-			gps.toCharArray(sendG, 5);
-			client.publish(publish_s, sendS);
-			client.publish(publish_v, sendV);
-			client.publish(publish_c, sendC);
-			client.publish(publish_e, sendE);
-			client.publish(publish_g, sendG);
-		}
-
-		client.loop();
-}
-
-void communication(void *parameters){
-	for(;;){
-		while(Serial.available()){
-			char in = (char)Serial.read();
-			
-			if (in != '/'){
-				buffer += in;
-			}
-
-			else if(in == '/' && count == 1){ // Speed
-				speed = buffer;
-				buffer = "";
-				count++;
-			}
-
-			else if(in == '/' && count == 2){ // Voltage
-				voltage = buffer;
-				buffer = "";
-				count++;
-			}
-
-			else if(in == '/' && count == 3){ // Current
-				current = buffer;
-				buffer = "";
-				count++;
-			}
-
-			else if(in == '/' && count == 4){ // Error
-				error = buffer;
-				buffer = "";
-				count++;
-			}
-
-			else if(in == '/' && count == 5){ // Gps
-				gps = buffer;
-				buffer = "";
-				count = 1;
-			}
-		}
+		reconnect();
 	}
-	vTaskDelay(10);
+
+	if (client.connected()) {
+		itoa(count, send, 10);
+		// speed.toCharArray(send, 5);
+		client.publish(publish, send);
+	}
+
+	count++;
+
+	client.loop();
+
+	delay(1000);
 }
 
 //***********************************

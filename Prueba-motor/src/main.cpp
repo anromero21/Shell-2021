@@ -51,31 +51,29 @@ const char* password = "2805042113";
 //*********** DEFINITIONS ***********
 //***********************************
 // INPUT    D-I
-#define FF1 18
-#define FF2 19
-#define CSOUT 21
-#define DIRO 22
-#define TACHO 23
+#define FF1 36  // VP
+#define FF2 39  // VN
+#define CSOUT 34
+#define DIRO 35
+#define TACHO 32
 
 // BUTTONS    I-D
-#define B_DIR 0
-#define B_COAST 4
-#define B_BRAKE 2
-#define B_MODE 15 
-#define B_RESET 8 // D1
-// #define POT 5
+#define B_DIR 33
+#define B_COAST 25
+#define B_BRAKE 26
+#define B_MODE 27
+#define B_RESET 14
 
 // OUTPUT
-#define RST 34
-#define DIR 35
-#define PWM_PIN 32
-#define MODE 33
-#define COAST 25
-#define BRAKE 26
-#define ESF 27
-#define REF 14
-#define VDSTH 12
-
+#define RST 23
+#define DIR 22
+#define PWM_PIN 21
+#define MODE 19
+#define COAST 18
+#define BRAKE 5
+#define ESF 17
+#define REF 4
+#define VDSTH 0
 
 // CONSTANTS
 #define AV 19
@@ -85,15 +83,16 @@ const char* password = "2805042113";
 #define DELTA_ANGLE 0.0951998
 #define CONVERSION 9.5493 
 
-const char *mqttServer = "ioticos.org";
+const char *mqttServer = "broker.mqttdashboard.com";
 const int mqttPort = 1883;
-const char *mqttUser = "VjclYKIMveCXbG0";
-const char *mqttPass = "2xAfdxh1sV7owRE";
-const char *subscribe = "Fb91eInFO93GxEe";
-const char *publish_R = "Fb91eInFO93GxEe/RPM";
-const char *publish_LC = "Fb91eInFO93GxEe/LOAD";
-const char *publish_RV = "Fb91eInFO93GxEe/REF";
-const char *publish_DR = "Fb91eInFO93GxEe/DUTY";
+const char *mqttUser = "ARL210701";
+const char *mqttPass = "Shell2020";
+const char *subscribe = "ESBCCM2020/input";
+const char *publish = "ESBCCM2020";
+const char *publish_R = "ESBCCM2020/RPM";
+const char *publish_LC = "ESBCCM2020/LOAD";
+const char *publish_RV = "ESBCCM2020/REF";
+const char *publish_DR = "ESBCCM2020/DUTY";
 
 ExternalInterrupt tachoInterrupt;
 ExternalInterrupt brakeInterrupt;
@@ -106,6 +105,8 @@ ExternalInterrupt FF2Interrupt;
 PWM pwmPin;
 PWM vdsthPin;
 PWM refPin;
+
+SemaphoreHandle_t xSemaphore;
 
 float dutyCycle = 0;
 float rpm;
@@ -156,9 +157,9 @@ void faults(void *parameter);
 void sensing(void *parameter);
 void speedDir(void *parameter);
 void currentControl(void* parameter);
+void setup_wifi();
 void callback(char* topic, byte* payload, unsigned int length);
 void reconnect();
-void setup_wifi();
 void communication(void* parameter);
 
 
@@ -194,7 +195,8 @@ void setup() {
   digitalWrite(ESF, HIGH);
   digitalWrite(MODE, LOW);
 
-  tripCurrent = 3;
+  tripCurrent = 8;
+
 
   xTaskCreatePinnedToCore(
 		  faults, // Función elegida
@@ -225,7 +227,7 @@ void setup() {
 		  &Task3, // Created Task
 		  1 // Core
 	  );  
-
+    
     xTaskCreatePinnedToCore(
 		  currentControl, // Función elegida
 		  "Task 4", 
@@ -308,7 +310,37 @@ void setup() {
 //***********************************
 //*************** LOOP **************
 //***********************************
-void loop() {
+void loop() { // OK
+ArduinoOTA.handle();
+
+if (!client.connected()) {
+			reconnect();
+		}
+
+		if (client.connected()) {
+      dtostrf(rpm, 4, 3, sendR);
+      dtostrf(loadCurrent, 4, 3, sendLC);
+      dtostrf(dutyRef, 4, 3, sendDR);
+      dtostrf(refVoltage, 4, 3, sendRV);
+
+			// rpm.toCharArray(sendR, 6);
+			// loadCurrent.toCharArray(sendLC, 6);
+			// dutyRef.toCharArray(sendDR, 6);
+			// refVoltage.toCharArray(sendRV, 6);
+    
+    //if( xSemaphore != NULL ){
+			client.publish(publish_R, sendR);
+			client.publish(publish_LC, sendLC);
+			client.publish(publish_DR, sendDR);
+			client.publish(publish_RV, sendRV);
+
+      delay(1500);
+    //}
+		}
+
+		client.loop();
+
+/*
   ArduinoOTA.handle();
   
   vdsthPin.setDuty(30);
@@ -332,6 +364,7 @@ void loop() {
   digitalWrite(COAST, dCoast);
   digitalWrite(BRAKE, HIGH);
   digitalWrite(RST, HIGH);
+  */
 }
 
 
@@ -339,7 +372,31 @@ void loop() {
 //*********** COMMUNICATION *********
 //***********************************
 void communication(void *parameters){
-	for(;;){
+  //xSemaphore = xSemaphoreCreateMutex();
+
+	for(;;){  
+  vdsthPin.setDuty(30);
+
+  bool dReset = resetInterrupt.getState();
+  bool dDir = dirInterrupt.getState();
+  bool dCoast = coastInterrupt.getState();
+  bool dBrake = coastInterrupt.getState();
+
+  Serial.print("DIR: ");
+  Serial.print(dDir);
+  Serial.print("  ");
+  Serial.print("COAST: ");
+  Serial.print(dCoast);
+  Serial.print("BRAKE: ");
+  Serial.print(dBrake);
+  Serial.print("RESET: ");
+  Serial.print(dReset);
+
+  // digitalWrite(DIR, HIGH);
+  digitalWrite(COAST, dCoast);
+  digitalWrite(BRAKE, dBrake);
+  digitalWrite(RST, HIGH);
+/*
     if (!client.connected()) {
 			reconnect();
 		}
@@ -350,28 +407,31 @@ void communication(void *parameters){
       dtostrf(dutyRef, 4, 3, sendDR);
       dtostrf(refVoltage, 4, 3, sendRV);
 
-      /*
-			rpm.toCharArray(sendR, 6);
-			loadCurrent.toCharArray(sendLC, 6);
-			dutyRef.toCharArray(sendDR, 6);
-			refVoltage.toCharArray(sendRV, 6);
-      */
-
+			// rpm.toCharArray(sendR, 6);
+			// loadCurrent.toCharArray(sendLC, 6);
+			// dutyRef.toCharArray(sendDR, 6);
+			// refVoltage.toCharArray(sendRV, 6);
+    
+    if( xSemaphore != NULL ){
 			client.publish(publish_R, sendR);
 			client.publish(publish_LC, sendLC);
 			client.publish(publish_DR, sendDR);
 			client.publish(publish_RV, sendRV);
+    }
 		}
 
 		client.loop();
+    */
+
+    vTaskDelay(10);
 	}
-	vTaskDelay(10);
 }
 
+
 //***********************************
-//************* SENSING *************
+//************ SPEED-DIR ************
 //***********************************
-void speedDir(void* parameter) {
+void speedDir(void* parameter) { // OK
   for (;;) {
     if (tachoInterrupt.available() && dirInterrupt.available()){
       bool direction = dirInterrupt.getState();
@@ -384,15 +444,16 @@ void speedDir(void* parameter) {
       Serial.print("RPM: ");
 	    Serial.println(rpm);
     }
+
+    vTaskDelay(10);
 	}
-	vTaskDelay(10);
 }
 
 
 //***********************************
 //************* SENSING *************
 //***********************************
-void sensing(void* parameter) {
+void sensing(void* parameter) { // OK
   for (;;) {
     csoutDividerVoltage = analogRead(CSOUT); // 3.3V/4096
     Serial.print("CSOUT DIVIDER VOLTAGE: ");
@@ -405,28 +466,30 @@ void sensing(void* parameter) {
     loadCurrent = (csoutVoltage - VOOS) / (AV * RSENSE);   
     Serial.print("LOAD CURRENT: ");
     Serial.println(loadCurrent);
+
+    vTaskDelay(10);
 	}
-	vTaskDelay(10);
 }
 
 
 //***********************************
 //********* CURRENT CONTROL *********
 //***********************************
-void currentControl(void* parameter) {
+void currentControl(void* parameter) { // OK
   for (;;) {
     // int lec = analogRead(POT); // 3.3V/4096
     // int conv = map(lec, 0, 4096, 0, 100);
 
     refVoltage = tripCurrent * (RSENSE * AV) + VOOS;
 
-    dutyRef = refVoltage * 3.3 / 100;
+    dutyRef = refVoltage * 100 / 3.3;
     if (dutyRef > 100) dutyRef = 100;
 
     pwmPin.setDuty(100); // 100-Torque Control     0-Current recirculate
     refPin.setDuty(dutyRef) ;
+
+    vTaskDelay(10);
 	}
-	vTaskDelay(10);
 }
 
 
@@ -439,25 +502,12 @@ void faults(void* parameter) {
     int l2 = FF2Interrupt.getState();
 
 		if (l1 == 1 && l2 == 1) continue;
-    if (l1 == 0 && l2 == 0) Serial.println("Undervoltage, Overtemperature or Logic fault");
-    if (l1 == 1 && l2 == 0) Serial.println("Short to ground, short to supply or shorted motor winding");
-    if (l1 == 0 && l2 == 1) Serial.println("Low load current");
+    else if (l1 == 0 && l2 == 0) Serial.println("Undervoltage, Overtemperature or Logic fault");
+    else if (l1 == 1 && l2 == 0) Serial.println("Short to ground, short to supply or shorted motor winding");
+    else if (l1 == 0 && l2 == 1) Serial.println("Low load current");
+    
+    vTaskDelay(10);
 	}
-	vTaskDelay(10);
-}
-
-//***********************************
-//************* CALLBACK ************
-//***********************************
-void callback(char* topic, byte* payload, unsigned int length) {
-	String incoming = "";
-	Serial.println("Mensaje recibido desde ->" + String(topic));
-	
-	for (int i = 0; i < length; i++) {
-		incoming += (char)payload[i];
-	}
-	incoming.trim();
-	Serial.println("Mensaje ->" + incoming);
 }
 
 
@@ -469,7 +519,7 @@ void reconnect() {
 		Serial.print("Intentando conexión MQTT...");
 
 		// Creamos un cliente ID
-		String clientId = "EBC05";
+		String clientId = "Shell";
 		clientId += String(random(0xffff), HEX);
 
 		// Conectamos
@@ -491,4 +541,19 @@ void reconnect() {
 			delay(5000);
 		}
 	}
+}
+
+
+//***********************************
+//************* CALLBACK ************
+//***********************************
+void callback(char* topic, byte* payload, unsigned int length) {
+	String incoming = "";
+	Serial.println("Mensaje recibido desde ->" + String(topic));
+	
+	for (int i = 0; i < length; i++) {
+		incoming += (char)payload[i];
+	}
+	incoming.trim();
+	Serial.println("Mensaje ->" + incoming);
 }
