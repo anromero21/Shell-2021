@@ -7,21 +7,16 @@
 #include <ArduinoOTA.h>
 #include <PubSubClient.h>
 
-//#include <BluetoothSerial.h>
 
 /*
-
 HA = blanco
 HB = naranja
 HC = morado
 
-*/
 
 //***********************************
 //************* FORMULAS ************
 //***********************************
-/* 
-
 Itrip = (Vref - Voos)/(Rsense*Av)    Av = 19   Voos = 320mV   Rsense = .005ohm    0 < Vref < 4V     Itrip(max) = 38.7368A
 
 Vcsout = Iload*Av*Rsense + Voos   Vcsout < 5V   Iload(max) = 49.2632A
@@ -51,11 +46,11 @@ const char* password = "2805042113";
 //*********** DEFINITIONS ***********
 //***********************************
 // INPUT    D-I
-#define FF1 36  // VP
-#define FF2 39  // VN
-#define CSOUT 34
-#define DIRO 35
-#define TACHO 32
+#define DIRO 36  // VP  
+#define FF2 39  // VN 
+#define FF1 34  
+#define TACHO 35  
+#define CSOUT 32 
 
 // BUTTONS    I-D
 #define B_DIR 33
@@ -65,13 +60,13 @@ const char* password = "2805042113";
 #define B_RESET 14
 
 // OUTPUT
-#define RST 23
-#define DIR 22
-#define PWM_PIN 21
-#define MODE 19
-#define COAST 18
-#define BRAKE 5
-#define ESF 17
+#define COAST 23 
+#define ESF 22  
+#define RST 21  
+#define BRAKE 19 
+#define DIR 18 
+#define PWM_PIN 5 
+#define MODE 17  
 #define REF 4
 #define VDSTH 0
 
@@ -84,7 +79,7 @@ const char* password = "2805042113";
 #define CONVERSION 9.5493 
 
 const char *mqttServer = "broker.mqttdashboard.com";
-const int mqttPort = 1883;
+const int mqttPort = 8000;
 const char *mqttUser = "ARL210701";
 const char *mqttPass = "Shell2020";
 const char *subscribe = "ESBCCM2020/input";
@@ -93,6 +88,8 @@ const char *publish_R = "ESBCCM2020/RPM";
 const char *publish_LC = "ESBCCM2020/LOAD";
 const char *publish_RV = "ESBCCM2020/REF";
 const char *publish_DR = "ESBCCM2020/DUTY";
+const char *publish_CV = "ESBCCM2020/CSOUT";
+const char *publish_F = "ESBCCM2020/FAULTS";
 
 ExternalInterrupt tachoInterrupt;
 ExternalInterrupt brakeInterrupt;
@@ -105,8 +102,6 @@ ExternalInterrupt FF2Interrupt;
 PWM pwmPin;
 PWM vdsthPin;
 PWM refPin;
-
-SemaphoreHandle_t xSemaphore;
 
 float dutyCycle = 0;
 float rpm;
@@ -131,17 +126,13 @@ int dutyRef = 0;
 //***********************************
 WiFiClient esp;
 PubSubClient client(esp);
-String speed;
-String voltage;
-String current;
-String error;
-String gps;
 char sendR[6];
 char sendLC[6];
 char sendRV[6];
 char sendDR[6];
-String buffer;
-int count = 1;
+char sendCV[6];
+char sendF[20];
+String fault;
 
 
 //***********************************
@@ -157,10 +148,10 @@ void faults(void *parameter);
 void sensing(void *parameter);
 void speedDir(void *parameter);
 void currentControl(void* parameter);
+void buttons(void* parameter);
 void setup_wifi();
 void callback(char* topic, byte* payload, unsigned int length);
 void reconnect();
-void communication(void* parameter);
 
 
 //***********************************
@@ -195,7 +186,7 @@ void setup() {
   digitalWrite(ESF, HIGH);
   digitalWrite(MODE, LOW);
 
-  tripCurrent = 8;
+  tripCurrent = 15;
 
 
   xTaskCreatePinnedToCore(
@@ -239,7 +230,7 @@ void setup() {
 	  );
 
     xTaskCreatePinnedToCore(
-		communication, // Función elegida
+		buttons, // Función elegida
 		"Task_5", 
 		1000, // Stack
 		NULL, // No parameters
@@ -257,19 +248,6 @@ void setup() {
     delay(5000);
     ESP.restart();
   }
-
-  // Port defaults to 3232
-  // ArduinoOTA.setPort(3232);
-
-  // Hostname defaults to esp3232-[MAC]
-  // ArduinoOTA.setHostname("myesp32");
-
-  // No authentication by default
-  // ArduinoOTA.setPassword("admin");
-
-  // Password can be set with it's md5 value as well
-  // MD5(admin) = 21232f297a57a5a743894a0e4a801fc3
-  // ArduinoOTA.setPasswordHash("21232f297a57a5a743894a0e4a801fc3");
 
   ArduinoOTA.onStart([]() {
     String type;
@@ -310,7 +288,7 @@ void setup() {
 //***********************************
 //*************** LOOP **************
 //***********************************
-void loop() { // OK
+void loop() {
 ArduinoOTA.handle();
 
 if (!client.connected()) {
@@ -322,58 +300,26 @@ if (!client.connected()) {
       dtostrf(loadCurrent, 4, 3, sendLC);
       dtostrf(dutyRef, 4, 3, sendDR);
       dtostrf(refVoltage, 4, 3, sendRV);
+      dtostrf(csoutVoltage, 4, 3, sendCV);
+      fault.toCharArray(sendF, 20);
 
-			// rpm.toCharArray(sendR, 6);
-			// loadCurrent.toCharArray(sendLC, 6);
-			// dutyRef.toCharArray(sendDR, 6);
-			// refVoltage.toCharArray(sendRV, 6);
-    
-    //if( xSemaphore != NULL ){
-			client.publish(publish_R, sendR);
-			client.publish(publish_LC, sendLC);
-			client.publish(publish_DR, sendDR);
-			client.publish(publish_RV, sendRV);
+			client.publish(publish_R, sendR);   // RPM
+			client.publish(publish_LC, sendLC); // LOAD CURRENT
+			client.publish(publish_DR, sendDR); // DUTY REF_PIN
+			client.publish(publish_RV, sendRV); // REF VOLTAGE
+      client.publish(publish_CV, sendCV); // CSOUT VOLTAGE
+      client.publish(publish_F, sendF);   // FAULTS
 
       delay(1500);
-    //}
 		}
-
 		client.loop();
-
-/*
-  ArduinoOTA.handle();
-  
-  vdsthPin.setDuty(30);
-
-  bool dReset = resetInterrupt.getState();
-  bool dDir = dirInterrupt.getState();
-  bool dCoast = coastInterrupt.getState();
-  bool dBrake = coastInterrupt.getState();
-
-  Serial.print("DIR: ");
-  Serial.print(dDir);
-  Serial.print("  ");
-  Serial.print("COAST: ");
-  Serial.print(dCoast);
-  Serial.print("BRAKE: ");
-  Serial.print(dBrake);
-  Serial.print("RESET: ");
-  Serial.print(dReset);
-
-  digitalWrite(DIR, HIGH);
-  digitalWrite(COAST, dCoast);
-  digitalWrite(BRAKE, HIGH);
-  digitalWrite(RST, HIGH);
-  */
 }
 
 
 //***********************************
-//*********** COMMUNICATION *********
+//************* BUTTONS *************
 //***********************************
-void communication(void *parameters){
-  //xSemaphore = xSemaphoreCreateMutex();
-
+void buttons(void *parameters){
 	for(;;){  
   vdsthPin.setDuty(30);
 
@@ -396,34 +342,8 @@ void communication(void *parameters){
   digitalWrite(COAST, dCoast);
   digitalWrite(BRAKE, dBrake);
   digitalWrite(RST, HIGH);
-/*
-    if (!client.connected()) {
-			reconnect();
-		}
 
-		if (client.connected()) {
-      dtostrf(rpm, 4, 3, sendR);
-      dtostrf(loadCurrent, 4, 3, sendLC);
-      dtostrf(dutyRef, 4, 3, sendDR);
-      dtostrf(refVoltage, 4, 3, sendRV);
-
-			// rpm.toCharArray(sendR, 6);
-			// loadCurrent.toCharArray(sendLC, 6);
-			// dutyRef.toCharArray(sendDR, 6);
-			// refVoltage.toCharArray(sendRV, 6);
-    
-    if( xSemaphore != NULL ){
-			client.publish(publish_R, sendR);
-			client.publish(publish_LC, sendLC);
-			client.publish(publish_DR, sendDR);
-			client.publish(publish_RV, sendRV);
-    }
-		}
-
-		client.loop();
-    */
-
-    vTaskDelay(10);
+  vTaskDelay(10);
 	}
 }
 
@@ -431,12 +351,12 @@ void communication(void *parameters){
 //***********************************
 //************ SPEED-DIR ************
 //***********************************
-void speedDir(void* parameter) { // OK
+void speedDir(void* parameter) {
   for (;;) {
     if (tachoInterrupt.available() && dirInterrupt.available()){
       bool direction = dirInterrupt.getState();
       float time = tachoInterrupt.getElapsedMicros();		
-	    motorRads = DELTA_ANGLE / (time / 1000000.0);
+	    motorRads = DELTA_ANGLE / (time / 1000000);
 	    rpm = (motorRads * CONVERSION); //60.0f) / 360.0f;
 
       digitalWrite(DIR, direction);
@@ -453,7 +373,7 @@ void speedDir(void* parameter) { // OK
 //***********************************
 //************* SENSING *************
 //***********************************
-void sensing(void* parameter) { // OK
+void sensing(void* parameter) {
   for (;;) {
     csoutDividerVoltage = analogRead(CSOUT); // 3.3V/4096
     Serial.print("CSOUT DIVIDER VOLTAGE: ");
@@ -475,7 +395,7 @@ void sensing(void* parameter) { // OK
 //***********************************
 //********* CURRENT CONTROL *********
 //***********************************
-void currentControl(void* parameter) { // OK
+void currentControl(void* parameter) {
   for (;;) {
     // int lec = analogRead(POT); // 3.3V/4096
     // int conv = map(lec, 0, 4096, 0, 100);
@@ -501,10 +421,20 @@ void faults(void* parameter) {
     int l1 = FF1Interrupt.getState();
     int l2 = FF2Interrupt.getState();
 
-		if (l1 == 1 && l2 == 1) continue;
-    else if (l1 == 0 && l2 == 0) Serial.println("Undervoltage, Overtemperature or Logic fault");
-    else if (l1 == 1 && l2 == 0) Serial.println("Short to ground, short to supply or shorted motor winding");
-    else if (l1 == 0 && l2 == 1) Serial.println("Low load current");
+		if (l1 == 1 && l2 == 1) fault = "No fault";
+
+    else if (l1 == 0 && l2 == 0){
+      fault = "Undervoltage, Overtemperature or Logic fault";
+      Serial.println("Undervoltage, Overtemperature or Logic fault");
+    }
+    else if (l1 == 1 && l2 == 0){
+      fault = "Short to ground, short to supply or shorted motor winding";
+      Serial.println("Short to ground, short to supply or shorted motor winding");
+    }
+    else if (l1 == 0 && l2 == 1) {
+      fault = "Low load current";
+      Serial.println("Low load current");
+    }
     
     vTaskDelay(10);
 	}
