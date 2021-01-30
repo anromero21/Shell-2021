@@ -32,6 +32,18 @@ Ct = 844pF
 
 duty_cycle
 
+DIR = 1 -> 
+DIR = 0 ->
+
+COAST = 1 -> OFF
+COAST = 0 -> ON
+
+BRAKE = 1 -> OFF
+BRAKE = 0 -> ON
+
+MODE = 1 -> SLOW DECAY
+MODE = 0 -> FAST DECAY
+
 */
 
 
@@ -131,7 +143,7 @@ char sendLC[6];
 char sendRV[6];
 char sendDR[6];
 char sendCV[6];
-char sendF[20];
+char sendF[8];
 String fault;
 
 
@@ -301,7 +313,7 @@ if (!client.connected()) {
       dtostrf(dutyRef, 4, 3, sendDR);
       dtostrf(refVoltage, 4, 3, sendRV);
       dtostrf(csoutVoltage, 4, 3, sendCV);
-      fault.toCharArray(sendF, 20);
+      fault.toCharArray(sendF, 8);
 
 			client.publish(publish_R, sendR);   // RPM
 			client.publish(publish_LC, sendLC); // LOAD CURRENT
@@ -421,18 +433,18 @@ void faults(void* parameter) {
     int l1 = FF1Interrupt.getState();
     int l2 = FF2Interrupt.getState();
 
-		if (l1 == 1 && l2 == 1) fault = "No fault";
+		if (l1 == 1 && l2 == 1) fault = "NONE";
 
     else if (l1 == 0 && l2 == 0){
-      fault = "Undervoltage, Overtemperature or Logic fault";
+      fault = "UV OE LF";
       Serial.println("Undervoltage, Overtemperature or Logic fault");
     }
     else if (l1 == 1 && l2 == 0){
-      fault = "Short to ground, short to supply or shorted motor winding";
+      fault = "SHORT";
       Serial.println("Short to ground, short to supply or shorted motor winding");
     }
     else if (l1 == 0 && l2 == 1) {
-      fault = "Low load current";
+      fault = "LOW LOAD";
       Serial.println("Low load current");
     }
     

@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "Prueba-motor"
+		},
+		{
+			"name": "UploadOTA",
+			"path": "UploadOTA"
+		},
+		{
+			"name": "BluetoothSerial",
+			"path": "..\\..\\..\\..\\..\\..\\..\\PlatformIO\\Projects\\BluetoothSerial"
+		},
+		{
+			"name": "MQTT",
+			"path": "MQTT"
+		}
+	],
+	"settings": {}
+}
